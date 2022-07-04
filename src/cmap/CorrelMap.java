@@ -8,10 +8,76 @@ public class CorrelMap {
 	private Functions func = new Functions();
 	private List<AggregateOperator> aggOperators;
 	
-	public CorrelMap(Scenario sc, List<AggregateOperator> aggOperators){
+	public CorrelMap(Scenario sc, List<AggregateOperator> aggOperators) {
 		if (aggOperators == null) {
 			this.aggOperators = new ArrayList<AggregateOperator>();
-			//TO DO: add operators
+			
+			AggregateOperator Avg = new AggregateOperator("average", 
+					(p)->{
+						ArrayList<Double> out = new ArrayList<Double>();
+						for(int i=0;i<p.size();i++) {
+							double sum = 0;
+							for(int j=0;j<p.get(i).size();j++) {
+								sum += p.get(i).get(j);
+							}
+							out.add(sum/p.get(i).size());
+						}
+						return out;
+						});
+			this.aggOperators.add(Avg);
+			
+			AggregateOperator Max = new AggregateOperator("max", 
+					(p)->{
+						ArrayList<Double> out = new ArrayList<Double>();
+						for(int i=0;i<p.size();i++) {
+							double max = p.get(i).get(0);
+							for(int j=0;j<p.get(i).size();j++) {
+								if(max < p.get(i).get(j)) {
+									max = p.get(i).get(j);
+								}			
+							}
+							out.add(max);
+						}
+						return out;
+						});
+			this.aggOperators.add(Max);
+			
+			AggregateOperator Min = new AggregateOperator("min", 
+					(p)->{
+						ArrayList<Double> out = new ArrayList<Double>();
+						for(int i=0;i<p.size();i++) {
+							double min = p.get(i).get(0);
+							for(int j=0;j<p.get(i).size();j++) {
+								if(min > p.get(i).get(j)) {
+									min = p.get(i).get(j);
+								}			
+							}
+							out.add(min);
+						}
+						return out;
+						});
+			this.aggOperators.add(Min);
+			
+			AggregateOperator Stdev = new AggregateOperator("standard dev", 
+					(p)->{
+						ArrayList<Double> out = new ArrayList<Double>();
+						for(int i=0;i<p.size();i++) {
+							out.add(func.stdev(out));
+						}
+						return out;
+						});
+			this.aggOperators.add(Stdev);
+			
+			AggregateOperator Med = new AggregateOperator("median", 
+					(p)->{
+						ArrayList<Double> out = new ArrayList<Double>();
+						for(int i=0;i<p.size();i++) {
+							out.add(func.median(out));
+						}
+						return out;
+						});
+			this.aggOperators.add(Med);
+			
 		} else {	
 			this.aggOperators = aggOperators;
 		}
@@ -43,19 +109,38 @@ public class CorrelMap {
 							+allSensors.get(m).name,this.aggOperators.get(b).name+"~X"+allSensors.get(s).name), 0.0); // ad 12, 13
 						}
 						
+						for(int j=0;j<node.neighbors.size();j++) { // ad 14
+							this.M.put(new StringPair(this.aggOperators.get(a).name+"~X"+allSensors.get(m).name, node.sensors.get(s).name), 0.0); // ad 15, 16
+						}
+					}
+					
+					for(int j=0;j<node.neighbors.size();j++) { // ad 17
+						this.M.put(new StringPair(node.sensors.get(m).name,"~X"+allSensors.get(s).name), 0.0); // ad 18
 					}
 				}
 			}
-		}
+			for(int j=0; j<node.neighbors.size();j++) { // ad 20
+				for(int k=j+1;k<node.neighbors.size();k++) {
+					Node sensorNodeJ = FindParentNode(allSensors.get(j));
+					for(int m=0;m<sensorNodeJ.sensors.size();m++) { // ad 21
+						Node sensorNodeK = FindParentNode(allSensors.get(k));
+						for(int s=0;s<sensorNodeK.sensors.size();s++) { // ad 22
+							this.M.put(new StringPair("~X"+allSensors.get(m).name,"~X"+allSensors.get(s).name), 0.0); // ad 23
+						}
+					}
+				}
+			}
+		}		
 		//End
 		
 		for(Node node:this.scenario.nodes) { //2
 			int L = 0;
+			int P = 0;
 			for(int m=0; m<node.sensors.size();m++) { //3
 				for(int s=m+1;s<node.sensors.size();s++) {
-					double oldValue = this.M.get(new StringPair(node.sensors.get(m).name,node.sensors.get(s).name)); //4
+					double oldValue = this.M.get(new StringPair(node.sensors.get(m).name,node.sensors.get(s).name)); 
 					this.M.put(new StringPair(node.sensors.get(m).name,node.sensors.get(s).name),
-							oldValue + func.FisherZ(Math.abs(func.corr(node.sensors.get(m).measurements, node.sensors.get(m).measurements))));
+							oldValue + func.FisherZ(Math.abs(func.corr(node.sensors.get(m).measurements, node.sensors.get(m).measurements)))); //4
 				}
 			}
 			L = node.neighbors.size(); //5
@@ -84,12 +169,45 @@ public class CorrelMap {
 							+allSensors.get(m).name,this.aggOperators.get(b).name+"~X"+allSensors.get(s).name));
 							
 							this.M.put(new StringPair(this.aggOperators.get(a).name+"~X"+allSensors.get(m).name,this.aggOperators.get(b).name+"~X"+allSensors.get(s).name),
-									oldValue + func.FisherZ(Math.abs(func.corr(this.aggOperators.get(a).Invoke(Xim),this.aggOperators.get(b).Invoke(Xis))))); // 12, 13
-						}				
+									oldValue + func.FisherZ(Math.abs(func.corr(this.aggOperators.get(a).Invoke(Xim),this.aggOperators.get(b).Invoke(Xis))))); //12, 13
+						}
+						
+						for(int j=0;j<node.neighbors.size();j++) { //14
+							double oldValue = this.M.get(new StringPair(this.aggOperators.get(a).name+"~X"+allSensors.get(m).name, node.sensors.get(s).name));
+							sensorNode = FindParentNode(allSensors.get(s));
+							this.M.put(new StringPair(this.aggOperators.get(a).name+"~X"+allSensors.get(m).name, node.sensors.get(s).name),
+									oldValue + func.FisherZ(Math.abs(func.corr(this.aggOperators.get(a).Invoke(Xim),sensorNode.sensors.get(s).measurements)))/L); //15, 16
+						}
 					}
 					
+					for(int j=0;j<node.neighbors.size();j++) { //17
+						double oldValue = this.M.get(new StringPair(node.sensors.get(m).name,"~X"+allSensors.get(s).name));
+						Node sensorNode = FindParentNode(allSensors.get(s));
+						this.M.put(new StringPair(node.sensors.get(m).name,"~X"+allSensors.get(s).name),
+								oldValue + func.FisherZ(Math.abs(func.corr(node.sensors.get(m).measurements, sensorNode.sensors.get(s).measurements)))/L); //18
+					}
 				}
 			}
+			
+			P = func.combination(L, 2); // 19
+			
+			for(int j=0; j<node.neighbors.size();j++) { //20
+				for(int k=j+1;k<node.neighbors.size();k++) {
+					Node sensorNodeJ = FindParentNode(allSensors.get(j));
+					for(int m=0;m<sensorNodeJ.sensors.size();m++) { //21
+						Node sensorNodeK = FindParentNode(allSensors.get(k));
+						for(int s=0;s<sensorNodeK.sensors.size();s++) { //22
+							double oldValue = this.M.get(new StringPair("~X"+allSensors.get(m).name,"~X"+allSensors.get(s).name));
+							this.M.put(new StringPair("~X"+allSensors.get(m).name,"~X"+allSensors.get(s).name),
+									oldValue + func.FisherZ(Math.abs(func.corr(sensorNodeJ.sensors.get(m).measurements, sensorNodeK.sensors.get(s).measurements)))/P); //23
+						}
+					}
+				}
+			}
+		}
+		
+		for(Map.Entry<StringPair, Double> entry:M.entrySet()) { //24
+			entry.setValue(func.FisherZInv(entry.getValue()/this.scenario.nodes.size()));
 		}
 	}
 	

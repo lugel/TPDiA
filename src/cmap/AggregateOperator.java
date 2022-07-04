@@ -9,7 +9,7 @@ public class AggregateOperator {
 		this.name = name;
 		this.f = f;
 	}
-	
+
 	@Override
 	public boolean equals(Object a) {
 		if ((((AggregateOperator)a).name.equals(this.name))) {
